@@ -8,3 +8,4 @@ pip install -r requirements.txt
 
 # Playwright kurulumu
 playwright install chromium
+python -m playwright install --with-deps chromium
