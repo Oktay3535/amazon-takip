@@ -1,4 +1,4 @@
 flask
 beautifulsoup4
-playwright
 gunicorn
+
