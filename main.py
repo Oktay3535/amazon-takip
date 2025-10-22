@@ -8,8 +8,7 @@ from flask import Flask
 app = Flask(__name__)
 
 # --- AYARLAR ---
-# BU SEFER DAHA KISA VE GARANTİ BİR ARAMA YAPIYORUZ
-ARAMA_KEYWORD = "Finish Ultimate 85 Kapsül" 
+ARAMA_KEYWORD = "Finish Ultimate 85 Kapsül"
 #ARAMA_KEYWORD = "Iphone 17 pro 256gb gümüş"
 
 URL_UYUMLU_KEYWORD = quote_plus(ARAMA_KEYWORD)
@@ -25,22 +24,16 @@ MAIL_SIFRESI = os.environ.get('MAIL_SIFRESI')
 ALICI_MAIL = os.environ.get('ALICI_MAIL')
 
 def eposta_gonder(bulunan_urun_linki):
-    if not all([GONDEREN_MAIL, MAIL_SIFRESI, ALICI_MAIL]):
-        return "HATA: E-posta bilgileri (ortam değişkenleri) ayarlanmamış!"
+    if not all([GONDEREN_MAIL, MAIL_SIFRESI, ALICI_MAIL]): return "HATA: E-posta bilgileri ayarlanmamış!"
     try:
-        with smtplib.SMTP("smtp.gmail.com", 587) as connection:
-            connection.starttls()
-            connection.login(user=GONDEREN_MAIL, password=MAIL_SIFRESI)
+        with smtplib.SMTP("smtp.gmail.com", 587) as c:
+            c.starttls()
+            c.login(user=GONDEREN_MAIL, password=MAIL_SIFRESI)
             konu = f"Stok Bildirimi: {ARAMA_KEYWORD} Stokta!"
             mesaj = f"Merhaba,\n\nTakip ettigin '{ARAMA_KEYWORD}' Amazon'da stoklara girdi ve saticisi Amazon.\n\nHemen satin almak icin linke git: {bulunan_urun_linki}".encode('utf-8')
-            connection.sendmail(
-                from_addr=GONDEREN_MAIL,
-                to_addrs=ALICI_MAIL,
-                msg=f"Subject:{konu}\n\n{mesaj.decode('utf-8')}"
-            )
+            c.sendmail(from_addr=GONDEREN_MAIL, to_addrs=ALICI_MAIL, msg=f"Subject:{konu}\n\n{mesaj.decode('utf-8')}")
         return "E-posta başarıyla gönderildi!"
-    except Exception as e:
-        return f"E-posta gönderilirken hata oluştu: {e}"
+    except Exception as e: return f"E-posta gönderilirken hata oluştu: {e}"
 
 def urun_sayfasini_kontrol_et(urun_url):
     try:
@@ -50,11 +43,9 @@ def urun_sayfasini_kontrol_et(urun_url):
         stok_durumu = soup.find(id="add-to-cart-button")
         satici_elementi = soup.select_one('#merchant-info a')
         satici_adi = satici_elementi.get_text(strip=True) if satici_elementi else "Bulunamadı"
-        if stok_durumu and "Amazon.com.tr" in satici_adi:
-            return True, f"Stok: VAR, Satıcı: {satici_adi}"
+        if stok_durumu and "Amazon.com.tr" in satici_adi: return True, f"Stok: VAR, Satıcı: {satici_adi}"
         return False, f"Stok: {'VAR' if stok_durumu else 'YOK'}, Satıcı: {satici_adi}"
-    except Exception as e:
-        return False, f"Ürün sayfası kontrol hatası: {e}"
+    except Exception as e: return False, f"Ürün sayfası kontrol hatası: {e}"
 
 def arama_yap_ve_kontrol_et():
     try:
@@ -64,35 +55,39 @@ def arama_yap_ve_kontrol_et():
         soup = BeautifulSoup(arama_sayfasi.content, "html.parser")
         sonuclar = soup.find_all("div", {"data-component-type": "s-search-result"})
         
-        if not sonuclar:
-            return "Arama sonucunda ürün bulunamadı veya sayfa yapısı değişmiş."
+        if not sonuclar: return "Arama sonucunda ürün bulunamadı veya sayfa yapısı değişmiş."
+        
+        print(f"{len(sonuclar)} adet ürün kutusu bulundu. Başlıklar taranıyor...")
 
-        for urun in sonuclar:
-            urun_basligi_elementi = urun.select_one('h2 a span')
-            if not urun_basligi_elementi: continue
-            
+        for i, urun in enumerate(sonuclar):
+            # --- YENİ, DAHA GÜÇLÜ BAŞLIK BULUCU ---
+            urun_basligi_elementi = urun.select_one('h2 a.a-link-normal span.a-text-normal')
+            if not urun_basligi_elementi:
+                # B planı: Bazen başlık farklı bir yapıda olabilir
+                urun_basligi_elementi = urun.select_one('span.a-text-normal')
+
+            if not urun_basligi_elementi:
+                print(f"-> Ürün #{i+1} için başlık elementi bulunamadı. Atlanıyor.")
+                continue
+
             urun_basligi = urun_basligi_elementi.get_text(strip=True).lower()
-            
-            # --- HATA AYIKLAMA İÇİN EKLENDİ ---
-            print(f"- Kontrol edilen başlık: {urun_basligi}")
+            print(f"- Başlık #{i+1}: {urun_basligi}", flush=True)
 
             if all(kelime in urun_basligi for kelime in aranacak_kelimeler):
-                urun_link_elementi = urun.select_one('h2 a')
+                urun_link_elementi = urun.select_one('h2 a.a-link-normal')
                 if urun_link_elementi and urun_link_elementi.has_attr('href'):
                     tam_urun_linki = "https://www.amazon.com.tr" + urun_link_elementi['href']
                     sonuc, mesaj = urun_sayfasini_kontrol_et(tam_urun_linki)
-                    print(f"Uygun başlık bulundu. Detaylar: {mesaj}")
+                    print(f"  [!] Uygun başlık bulundu. Detaylar: {mesaj}")
                     if sonuc:
                         eposta_mesaji = eposta_gonder(tam_urun_linki)
                         return f"!!! HEDEF BULUNDU !!! Link: {tam_urun_linki} | E-posta Durumu: {eposta_mesaji}"
         
-        return f"Hedef ürün bu aramada bulunamadı. {len(sonuclar)} ürün kontrol edildi."
-    except Exception as e:
-        return f"Beklenmedik bir arama hatası oluştu: {e}"
+        return f"Hedef ürün bu aramada bulunamadı."
+    except Exception as e: return f"Beklenmedik bir arama hatası oluştu: {e}"
 
 @app.route('/')
-def home():
-    return "Amazon takip betiği aktif. Kontrol için /check adresini ziyaret edin."
+def home(): return "Amazon takip betiği aktif. Kontrol için /check adresini ziyaret edin."
 
 @app.route('/check')
 def trigger_check():
