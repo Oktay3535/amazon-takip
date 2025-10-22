@@ -5,11 +5,13 @@ import requests
 from bs4 import BeautifulSoup
 from flask import Flask
 
-# Flask uygulamasını başlatıyoruz. Render bu 'app' değişkenini kullanacak.
 app = Flask(__name__)
 
 # --- AYARLAR ---
+# Test için bu satırı kullanın. Test bitince iPhone'a geri dönersiniz.
 ARAMA_KEYWORD = "Finish Ultimate 85 Kapsül Bulaşık Makinesi Deterjanı Tableti"
+#ARAMA_KEYWORD = "Iphone 17 pro 256gb gümüş"
+
 URL_UYUMLU_KEYWORD = quote_plus(ARAMA_KEYWORD)
 AMAZON_ARAMA_URL = f"https://www.amazon.com.tr/s?k={URL_UYUMLU_KEYWORD}"
 
@@ -18,7 +20,6 @@ HEADERS = {
     "Accept-Language": "tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7"
 }
 
-# --- E-POSTA AYARLARI (Render Ortam Değişkenlerinden alınacak) ---
 GONDEREN_MAIL = os.environ.get('MAIL_ADRESI')
 MAIL_SIFRESI = os.environ.get('MAIL_SIFRESI')
 ALICI_MAIL = os.environ.get('ALICI_MAIL')
@@ -57,6 +58,9 @@ def urun_sayfasini_kontrol_et(urun_url):
 
 def arama_yap_ve_kontrol_et():
     try:
+        # Anahtar kelimeleri küçük harfe çevirip listeye böl
+        aranacak_kelimeler = ARAMA_KEYWORD.lower().split()
+
         arama_sayfasi = requests.get(AMAZON_ARAMA_URL, headers=HEADERS)
         arama_sayfasi.raise_for_status()
         soup = BeautifulSoup(arama_sayfasi.content, "html.parser")
@@ -70,29 +74,30 @@ def arama_yap_ve_kontrol_et():
             if not urun_basligi_elementi: continue
             
             urun_basligi = urun_basligi_elementi.get_text(strip=True).lower()
-            if "iphone 17 pro" in urun_basligi and "256gb" in urun_basligi and "gümüş" in urun_basligi:
+
+            # --- YENİ AKILLI KONTROL ---
+            # 'aranacak_kelimeler' listesindeki tüm kelimeler ürün başlığında geçiyor mu?
+            if all(kelime in urun_basligi for kelime in aranacak_kelimeler):
                 urun_link_elementi = urun.select_one('h2 a')
                 if urun_link_elementi and urun_link_elementi.has_attr('href'):
                     tam_urun_linki = "https://www.amazon.com.tr" + urun_link_elementi['href']
                     sonuc, mesaj = urun_sayfasini_kontrol_et(tam_urun_linki)
+                    print(f"Uygun başlık bulundu: '{urun_basligi}'. Detaylar: {mesaj}")
                     if sonuc:
                         eposta_mesaji = eposta_gonder(tam_urun_linki)
                         return f"!!! HEDEF BULUNDU !!! Link: {tam_urun_linki} | E-posta Durumu: {eposta_mesaji}"
+        
         return f"Hedef ürün bu aramada bulunamadı. {len(sonuclar)} ürün kontrol edildi."
     except Exception as e:
         return f"Beklenmedik bir arama hatası oluştu: {e}"
 
-# UptimeRobot'un ziyaret edeceği ana sayfa
 @app.route('/')
 def home():
     return "Amazon takip betiği aktif. Kontrol için /check adresini ziyaret edin."
 
-# UptimeRobot'un 5 dakikada bir ziyaret edeceği ve kontrolü başlatacağı sayfa
 @app.route('/check')
 def trigger_check():
     print("Kontrol tetiklendi...")
     result = arama_yap_ve_kontrol_et()
     print(result)
-
     return result
-
