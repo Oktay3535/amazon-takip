@@ -8,8 +8,8 @@ from flask import Flask
 app = Flask(__name__)
 
 # --- AYARLAR ---
-# Test için bu satırı kullanın. Test bitince iPhone'a geri dönersiniz.
-ARAMA_KEYWORD = "Finish Ultimate 85 Kapsül Bulaşık Makinesi Deterjanı Tableti"
+# BU SEFER DAHA KISA VE GARANTİ BİR ARAMA YAPIYORUZ
+ARAMA_KEYWORD = "Finish Ultimate 85 Kapsül" 
 #ARAMA_KEYWORD = "Iphone 17 pro 256gb gümüş"
 
 URL_UYUMLU_KEYWORD = quote_plus(ARAMA_KEYWORD)
@@ -58,9 +58,7 @@ def urun_sayfasini_kontrol_et(urun_url):
 
 def arama_yap_ve_kontrol_et():
     try:
-        # Anahtar kelimeleri küçük harfe çevirip listeye böl
         aranacak_kelimeler = ARAMA_KEYWORD.lower().split()
-
         arama_sayfasi = requests.get(AMAZON_ARAMA_URL, headers=HEADERS)
         arama_sayfasi.raise_for_status()
         soup = BeautifulSoup(arama_sayfasi.content, "html.parser")
@@ -74,15 +72,16 @@ def arama_yap_ve_kontrol_et():
             if not urun_basligi_elementi: continue
             
             urun_basligi = urun_basligi_elementi.get_text(strip=True).lower()
+            
+            # --- HATA AYIKLAMA İÇİN EKLENDİ ---
+            print(f"- Kontrol edilen başlık: {urun_basligi}")
 
-            # --- YENİ AKILLI KONTROL ---
-            # 'aranacak_kelimeler' listesindeki tüm kelimeler ürün başlığında geçiyor mu?
             if all(kelime in urun_basligi for kelime in aranacak_kelimeler):
                 urun_link_elementi = urun.select_one('h2 a')
                 if urun_link_elementi and urun_link_elementi.has_attr('href'):
                     tam_urun_linki = "https://www.amazon.com.tr" + urun_link_elementi['href']
                     sonuc, mesaj = urun_sayfasini_kontrol_et(tam_urun_linki)
-                    print(f"Uygun başlık bulundu: '{urun_basligi}'. Detaylar: {mesaj}")
+                    print(f"Uygun başlık bulundu. Detaylar: {mesaj}")
                     if sonuc:
                         eposta_mesaji = eposta_gonder(tam_urun_linki)
                         return f"!!! HEDEF BULUNDU !!! Link: {tam_urun_linki} | E-posta Durumu: {eposta_mesaji}"
