@@ -9,7 +9,7 @@ from flask import Flask
 app = Flask(__name__)
 
 # --- AYARLAR ---
-ARAMA_KEYWORD = "Finish Quantum Max Bulaşık Makinesi Tableti 85 Kapsül"
+ARAMA_KEYWORD = "Finish Ultimate 85 Kapsül Bulaşık Makinesi Deterjanı Tableti"
 URL_UYUMLU_KEYWORD = quote_plus(ARAMA_KEYWORD)
 AMAZON_ARAMA_URL = f"https://www.amazon.com.tr/s?k={URL_UYUMLU_KEYWORD}"
 
@@ -95,3 +95,4 @@ def trigger_check():
     print(result)
 
     return result
+
